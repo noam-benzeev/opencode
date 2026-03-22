@@ -37,9 +37,19 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 1
 
       - name: Setup Bun
         uses: ./.github/actions/setup-bun
+
+      - name: Cache Turbo
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ hashFiles('turbo.json') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-${{ hashFiles('turbo.json') }}-
+            ${{ runner.os }}-turbo-
 
       - name: Configure git identity
         run: |
@@ -50,7 +60,7 @@ jobs:
         run: bun turbo test
 
   e2e:
-    name: e2e (${{ matrix.settings.name }})
+    name: e2e (${{ matrix.settings.name }}, shard ${{ matrix.shard }}/4)
     strategy:
       fail-fast: false
       matrix:
@@ -59,6 +69,7 @@ jobs:
             host: ubuntu-latest
           - name: windows
             host: windows-latest
+        shard: [1, 2, 3, 4]
     runs-on: ${{ matrix.settings.host }}
     env:
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright-browsers
@@ -71,6 +82,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 1
 
       - name: Setup Bun
         uses: ./.github/actions/setup-bun
@@ -99,7 +111,7 @@ jobs:
         run: bunx playwright install chromium
 
       - name: Run app e2e tests
-        run: bun --cwd packages/app test:e2e:local
+        run: bun --cwd packages/app test:e2e:local -- --shard=${{ matrix.shard }}/4
         env:
           CI: true
         timeout-minutes: 30
@@ -108,7 +120,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-${{ matrix.settings.name }}-${{ github.run_attempt }}
+          name: playwright-${{ matrix.settings.name }}-shard${{ matrix.shard }}-${{ github.run_attempt }}
           if-no-files-found: ignore
           retention-days: 7
           path: |
