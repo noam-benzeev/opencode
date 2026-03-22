@@ -67,15 +67,12 @@ jobs:
         settings:
           - name: linux
             host: ubuntu-latest
-            container: mcr.microsoft.com/playwright:v1.57.0-noble
           - name: windows
             host: windows-latest
-            container: ""
         shard: [1, 2, 3, 4]
     runs-on: ${{ matrix.settings.host }}
-    container: ${{ matrix.settings.container || null }}
     env:
-      PLAYWRIGHT_BROWSERS_PATH: ${{ matrix.settings.container == '' && format('{0}/.playwright-browsers', github.workspace) || '' }}
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright-browsers
     defaults:
       run:
         shell: bash
@@ -91,14 +88,12 @@ jobs:
         uses: ./.github/actions/setup-bun
 
       - name: Read Playwright version
-        if: matrix.settings.container == ''
         id: playwright-version
         run: |
           version=$(node -e 'console.log(require("./packages/app/package.json").devDependencies["@playwright/test"])')
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Cache Playwright browsers
-        if: matrix.settings.container == ''
         id: playwright-cache
         uses: actions/cache@v4
         with:
@@ -106,12 +101,12 @@ jobs:
           key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright-version.outputs.version }}-chromium
 
       - name: Install Playwright system dependencies
-        if: runner.os == 'Linux' && matrix.settings.container == ''
+        if: runner.os == 'Linux'
         working-directory: packages/app
         run: bunx playwright install-deps chromium
 
       - name: Install Playwright browsers
-        if: matrix.settings.container == '' && steps.playwright-cache.outputs.cache-hit != 'true'
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         working-directory: packages/app
         run: bunx playwright install chromium
 
